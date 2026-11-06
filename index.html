@@ -325,38 +325,104 @@ async function authedGet(path) {
   return res.json();
 }
 
+// Fetch domains. Tries the REST list endpoint first; if that fails or comes
+// back empty, falls back to the domain search index (the same source the
+// OpenMetadata UI itself uses). Returns [{value, label}].
+async function fetchDomains() {
+  const errors = [];
+
+  try {
+    const res = await authedGet('/v1/domains?limit=100');
+    const list = (res.data || []).map(d => ({
+      value: d.fullyQualifiedName || d.name,
+      label: d.displayName || d.name,
+    }));
+    if (list.length) return { list, errors };
+    errors.push('/v1/domains returned an empty list');
+  } catch (err) {
+    errors.push(err.message);
+  }
+
+  try {
+    const res = await authedGet('/v1/search/query?q=*&index=domain_search_index&from=0&size=100');
+    const list = ((res.hits && res.hits.hits) || []).map(h => {
+      const s = h._source || {};
+      return { value: s.fullyQualifiedName || s.name, label: s.displayName || s.name };
+    }).filter(d => d.value);
+    if (list.length) return { list, errors };
+    errors.push('domain_search_index returned no hits');
+  } catch (err) {
+    errors.push(err.message);
+  }
+
+  return { list: [], errors };
+}
+
+// Fetch tags (independent of domains, so one failing doesn't block the other).
+async function fetchTags() {
+  try {
+    const res = await authedGet('/v1/tags?limit=100');
+    return {
+      list: (res.data || []).map(t => ({ value: t.fullyQualifiedName, label: t.fullyQualifiedName })),
+      errors: [],
+    };
+  } catch (err) {
+    return { list: [], errors: [err.message] };
+  }
+}
+
+function fillSelect(selectEl, allLabel, items, keepValue) {
+  selectEl.innerHTML = `<option value="">${allLabel}</option>`;
+  items.forEach(i => {
+    const opt = document.createElement('option');
+    opt.value = i.value;
+    opt.textContent = i.label;
+    selectEl.appendChild(opt);
+  });
+  if (keepValue && items.some(i => i.value === keepValue)) selectEl.value = keepValue;
+}
+
 async function loadFilters() {
   if (!state.token) return;
-  try {
-    const [domains, tags] = await Promise.all([
-      authedGet('/v1/domains?limit=100'),
-      authedGet('/v1/tags?limit=100'),
-    ]);
 
-    const domainSel = el('domainSelect');
-    domainSel.innerHTML = '<option value="">All domains</option>';
-    (domains.data || []).forEach(d => {
-      const opt = document.createElement('option');
-      opt.value = d.fullyQualifiedName;
-      opt.textContent = d.displayName || d.name;
-      domainSel.appendChild(opt);
-    });
+  const [domains, tags] = await Promise.all([fetchDomains(), fetchTags()]);
 
-    const tagSel = el('tagSelect');
-    tagSel.innerHTML = '<option value="">All tags</option>';
-    (tags.data || []).forEach(t => {
-      const opt = document.createElement('option');
-      opt.value = t.fullyQualifiedName;
-      opt.textContent = t.fullyQualifiedName;
-      tagSel.appendChild(opt);
-    });
+  fillSelect(el('domainSelect'), 'All domains', domains.list, state.domain);
+  fillSelect(el('tagSelect'), 'All tags', tags.list, state.tag);
 
-    el('filterCount').textContent = `${(domains.data||[]).length} domains · ${(tags.data||[]).length} tags loaded`;
+  el('filterCount').textContent = `${domains.list.length} domains · ${tags.list.length} tags loaded`;
+
+  const problems = [];
+  if (!domains.list.length) problems.push(`Domains: ${domains.errors.join('; ')}`);
+  if (!tags.list.length) problems.push(`Tags: ${tags.errors.join('; ')}`);
+
+  if (problems.length) {
+    console.error('Filter load problems:', problems);
+    setStatus(`Some filters did not load. ${problems.join(' | ')}. Domains will also be collected from search results.`, true);
+  } else {
     setStatus('Filters loaded. Ready to search.');
-  } catch (err) {
-    console.error(err);
-    setStatus(`Could not load domain/tag filters: ${err.message}`, true);
   }
+}
+
+// Last-resort fallback: if the Domain dropdown is still empty after a search,
+// build its options from the domains found on the returned data products.
+function harvestDomainsFromHits(hits) {
+  const sel = el('domainSelect');
+  if (sel.options.length > 1) return;   // already populated, leave it alone
+
+  const seen = new Map();
+  hits.forEach(h => {
+    const s = h._source || {};
+    const ds = s.domains || (s.domain ? [s.domain] : []);
+    ds.forEach(d => {
+      const fqn = d.fullyQualifiedName || d.name;
+      if (fqn && !seen.has(fqn)) seen.set(fqn, d.displayName || d.name || fqn);
+    });
+  });
+  if (!seen.size) return;
+
+  fillSelect(sel, 'All domains', [...seen].map(([value, label]) => ({ value, label })), state.domain);
+  el('filterCount').textContent = `${seen.size} domains (collected from search results)`;
 }
 
 if (state.token) loadFilters();
@@ -422,6 +488,7 @@ function renderResults(data) {
   const hits = (data.hits && data.hits.hits) || [];
   const total = (data.hits && data.hits.total && data.hits.total.value) || hits.length;
   setStatus(`${total} data product${total === 1 ? '' : 's'} · ${data.took ?? '?'}ms`);
+  harvestDomainsFromHits(hits);
 
   if (!hits.length) {
     el('resultsWrap').innerHTML = `<div class="empty">No data products match that query and filter combination.</div>`;
