@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Data Product Search Tool</title>
+<style>
+  :root{
+    --navy-deep:#002847;
+    --navy:#003e67;
+    --steel:#7aa5c1;
+    --olive:#314f1a;
+    --sage:#85b063;
+    --black:#000000;
+    --mist:#d6e3ec;
+    --white:#ffffff;
+
+    --paper: var(--mist);
+    --card: var(--white);
+    --ink: var(--navy-deep);
+    --ink-soft: var(--navy);
+    --line: var(--steel);
+    --line-soft: #e4edf3;
+    --accent: var(--olive);
+    --accent-soft: var(--sage);
+    --error: var(--black);
+
+    --sys: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: 'SF Mono', 'IBM Plex Mono', Consolas, monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:var(--sys); font-weight:400; font-size:14px; line-height:1.5;
+    min-height:100vh;
+  }
+
+  /* ---------- Header / ledger bar ---------- */
+  header{
+    border-bottom:2px solid var(--navy-deep);
+    padding:22px 32px 18px;
+    background:var(--white);
+  }
+  .masthead{
+    display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:10px;
+    max-width:1080px; margin:0 auto 16px;
+  }
+  .masthead h1{
+    margin:0; font-family:var(--sys); font-size:36px; font-weight:700; letter-spacing:-0.01em;
+    color:var(--navy-deep);
+  }
+  .masthead .sub{
+    font-family:var(--sys); font-size:14px; font-weight:400; color:var(--navy); margin-top:4px;
+  }
+  .gear{
+    font-family:var(--sys); font-size:14px; font-weight:700; background:none; border:1px solid var(--navy-deep);
+    padding:7px 14px; cursor:pointer; color:var(--navy-deep); border-radius:3px;
+  }
+  .gear:hover{ background:var(--navy-deep); color:var(--white); }
+
+  #config{
+    max-width:1080px; margin:0 auto; display:none;
+    grid-template-columns:1.4fr 1fr auto; gap:10px; padding-top:6px;
+  }
+  #config.open{ display:grid; }
+  #config .field label{
+    display:block; font-family:var(--sys); font-size:14px; font-weight:700; color:var(--navy);
+    margin-bottom:4px;
+  }
+  #config input{
+    width:100%; font-family:var(--mono); font-size:13px; padding:8px 10px;
+    border:1px solid var(--steel); border-radius:3px; background:var(--white); color:var(--ink);
+  }
+  #config input:focus{ outline:none; border-color:var(--olive); }
+  #config .save{
+    align-self:end; font-family:var(--sys); font-size:14px; font-weight:700;
+    background:var(--olive); color:var(--white); border:none; padding:9px 18px; border-radius:3px; cursor:pointer;
+  }
+  #config .save:hover{ background:var(--navy-deep); }
+  #config .hint{
+    grid-column:1 / -1; font-family:var(--sys); font-size:14px; font-weight:400; color:var(--navy); line-height:1.6;
+  }
+  #config .hint a{ color:var(--olive); }
+
+  /* ---------- Search bar ---------- */
+  .search-row{
+    max-width:1080px; margin:0 auto; display:flex; gap:10px; align-items:center;
+  }
+  .search-row input[type=text]{
+    flex:1; font-family:var(--sys); font-size:16px; font-weight:400; padding:12px 14px;
+    border:1px solid var(--navy-deep); border-radius:3px; background:var(--white); color:var(--ink);
+  }
+  .search-row input[type=text]:focus{ outline:none; box-shadow:0 0 0 2px var(--olive) inset; }
+  .search-row button{
+    font-family:var(--sys); font-size:14px; font-weight:700; background:var(--navy-deep); color:var(--white);
+    border:none; padding:12px 22px; border-radius:3px; cursor:pointer; white-space:nowrap;
+  }
+  .search-row button:hover{ background:var(--olive); }
+
+  /* ---------- Filter row ---------- */
+  .filters{
+    max-width:1080px; margin:12px auto 0; display:flex; gap:10px; flex-wrap:wrap; align-items:center;
+  }
+  .filters .fgroup{ display:flex; flex-direction:column; gap:4px; }
+  .filters label{
+    font-family:var(--sys); font-size:14px; font-weight:700; color:var(--navy);
+  }
+  .filters select{
+    font-family:var(--sys); font-size:14px; font-weight:400; padding:7px 9px; border:1px solid var(--steel);
+    border-radius:3px; background:var(--white); color:var(--ink); min-width:180px;
+  }
+  .filters select:focus{ outline:none; border-color:var(--olive); }
+  .filters .clear{
+    align-self:flex-end; font-family:var(--sys); font-size:14px; font-weight:700; background:none; border:1px solid var(--steel);
+    color:var(--navy); padding:7px 12px; border-radius:3px; cursor:pointer;
+  }
+  .filters .clear:hover{ border-color:var(--black); color:var(--black); }
+  .filters .fcount{
+    font-family:var(--sys); font-size:14px; font-weight:400; color:var(--navy); align-self:flex-end; padding-bottom:8px;
+  }
+
+  /* ---------- Body ---------- */
+  main{ max-width:1080px; margin:0 auto; padding:26px 32px 80px; }
+  .status-line{
+    font-family:var(--sys); font-size:14px; font-weight:400; color:var(--navy); margin-bottom:14px; min-height:18px;
+  }
+  .status-line.error{ color:var(--black); font-weight:700; }
+
+  .empty{
+    font-family:var(--sys); font-size:14px; font-weight:400; color:var(--navy); padding:60px 10px; text-align:center; line-height:1.9;
+    border:1px dashed var(--steel); border-radius:3px; background:var(--white);
+  }
+  .empty b{ color:var(--navy-deep); }
+
+  .results{ display:flex; flex-direction:column; }
+  .card{
+    display:grid; grid-template-columns:110px 1fr; gap:16px;
+    padding:16px 4px; border-bottom:1px solid var(--line-soft); cursor:pointer; background:var(--white);
+  }
+  .card:hover{ background:var(--mist); }
+  .card .idx{
+    font-family:var(--sys); font-size:14px; color:var(--navy); padding-top:3px;
+  }
+  .card .idx .type{
+    display:inline-block; background:var(--olive); color:var(--white); padding:2px 8px; border-radius:3px;
+    margin-bottom:6px; font-size:12px; font-weight:700;
+  }
+  .card .idx .domain-pill{
+    display:inline-block; background:none; border:1px solid var(--sage); color:var(--olive);
+    padding:2px 8px; border-radius:3px; font-size:12px; font-weight:700;
+  }
+  .card h3{
+    margin:0 0 4px; font-family:var(--sys); font-size:20px; font-weight:700; color:var(--navy-deep);
+  }
+  .card .fqn{
+    font-family:var(--mono); font-size:12px; color:var(--navy); margin-bottom:6px; word-break:break-all;
+  }
+  .card p{
+    margin:0 0 8px; font-family:var(--sys); font-size:14px; font-weight:400; color:var(--ink); line-height:1.55;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+  }
+  .tags{ display:flex; gap:6px; flex-wrap:wrap; }
+  .tag{
+    font-family:var(--sys); font-size:12px; font-weight:400; border:1px solid var(--steel); color:var(--navy);
+    padding:2px 8px; border-radius:3px; background:var(--mist);
+  }
+
+  /* ---------- Detail drawer ---------- */
+  #overlay{
+    position:fixed; inset:0; background:rgba(0,40,71,0.4); display:none; z-index:10;
+  }
+  #overlay.open{ display:block; }
+  #drawer{
+    position:fixed; top:0; right:-460px; width:440px; max-width:92vw; height:100%;
+    background:var(--white); border-left:2px solid var(--navy-deep); z-index:11;
+    transition:right 0.22s ease; overflow-y:auto; padding:24px 22px 60px;
+  }
+  #drawer.open{ right:0; }
+  #drawer .close{
+    font-family:var(--sys); font-size:14px; font-weight:700; background:none; border:1px solid var(--navy-deep);
+    padding:5px 12px; cursor:pointer; border-radius:3px; float:right; color:var(--navy-deep);
+  }
+  #drawer .close:hover{ background:var(--navy-deep); color:var(--white); }
+  #drawer h2{ font-family:var(--sys); font-size:20px; font-weight:700; margin:6px 0 2px; clear:both; color:var(--navy-deep);}
+  #drawer .d-fqn{ font-family:var(--mono); font-size:12px; color:var(--navy); margin-bottom:16px; word-break:break-all;}
+  #drawer .d-section{ margin-bottom:18px; }
+  #drawer .d-label{ font-family:var(--sys); font-size:16px; font-weight:700; color:var(--navy-deep); margin-bottom:6px;}
+  #drawer .d-desc{ font-family:var(--sys); font-size:14px; font-weight:400; line-height:1.65; color:var(--ink); }
+  #drawer pre{
+    font-family:var(--mono); font-size:12px; background:var(--navy-deep); color:var(--mist); padding:14px;
+    border-radius:3px; overflow-x:auto; line-height:1.5; max-height:340px;
+  }
+  #drawer .owners, #drawer .d-tags{ display:flex; gap:6px; flex-wrap:wrap; }
+
+  ::-webkit-scrollbar{ width:9px; }
+  ::-webkit-scrollbar-thumb{ background:var(--steel); border-radius:4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="masthead">
+    <div>
+      <h1>Data Product Search Tool</h1>
+      <div class="sub">Search over your OpenMetadata data products</div>
+    </div>
+    <button class="gear" id="gearBtn">⚙ connection</button>
+  </div>
+
+  <div id="config">
+    <div class="field">
+      <label>HOST (API BASE)</label>
+      <input type="text" id="hostInput" value="https://sandbox.open-metadata.org/api" spellcheck="false">
+    </div>
+    <div class="field">
+      <label>PERSONAL ACCESS TOKEN</label>
+      <input type="password" id="tokenInput" placeholder="paste JWT / PAT here" spellcheck="false">
+    </div>
+    <button class="save" id="saveBtn">Save &amp; connect</button>
+    <div class="hint">
+      This is pre-pointed at OpenMetadata's public sandbox. Log in at
+      <a href="https://sandbox.open-metadata.org" target="_blank">sandbox.open-metadata.org</a>
+      with <b>admin@open-metadata.org / admin</b> (or your own sandbox account), then go to
+      Settings → Security → Personal Access Tokens to generate one and paste it above.
+      Point HOST at any OpenMetadata instance's <code>/api</code> root to reuse this against your own deployment.
+      Saving loads the Domain and Tag filters below from that instance.
+    </div>
+  </div>
+
+  <div class="search-row" style="margin-top:16px;">
+    <input type="text" id="searchInput" placeholder="Search data products…">
+    <button id="searchBtn">Search</button>
+  </div>
+
+  <div class="filters">
+    <div class="fgroup">
+      <label>Domain</label>
+      <select id="domainSelect"><option value="">All domains</option></select>
+    </div>
+    <div class="fgroup">
+      <label>Tag</label>
+      <select id="tagSelect"><option value="">All tags</option></select>
+    </div>
+    <button class="clear" id="clearFilters">Clear filters</button>
+    <div class="fcount" id="filterCount"></div>
+  </div>
+</header>
+
+<main>
+  <div class="status-line" id="statusLine"></div>
+  <div id="resultsWrap">
+    <div class="empty">Type a query above and press <b>Search</b> — or search <b>*</b> to browse every data product. Use the Domain / Tag dropdowns to narrow the list.</div>
+  </div>
+</main>
+
+<div id="overlay"></div>
+<div id="drawer">
+  <button class="close" id="closeDrawer">close ✕</button>
+  <h2 id="dTitle"></h2>
+  <div class="d-fqn" id="dFqn"></div>
+
+  <div class="d-section">
+    <div class="d-label">Description</div>
+    <div class="d-desc" id="dDesc">—</div>
+  </div>
+  <div class="d-section">
+    <div class="d-label">Domain</div>
+    <div class="owners" id="dDomain">—</div>
+  </div>
+  <div class="d-section">
+    <div class="d-label">Owners</div>
+    <div class="owners" id="dOwners">—</div>
+  </div>
+  <div class="d-section">
+    <div class="d-label">Tags</div>
+    <div class="d-tags" id="dTags">—</div>
+  </div>
+  <div class="d-section">
+    <div class="d-label">Raw record</div>
+    <pre id="dRaw"></pre>
+  </div>
+</div>
+
+<script>
+const INDEX = 'data_product_search_index';
+
+let state = {
+  host: localStorage.getItem('om_host') || 'https://sandbox.open-metadata.org/api',
+  token: sessionStorage.getItem('om_token') || '',
+  domain: '',
+  tag: '',
+};
+
+const el = id => document.getElementById(id);
+
+// ---------- config panel ----------
+el('hostInput').value = state.host;
+el('tokenInput').value = state.token;
+
+el('gearBtn').onclick = () => el('config').classList.toggle('open');
+el('saveBtn').onclick = () => {
+  state.host = el('hostInput').value.trim().replace(/\/$/, '');
+  state.token = el('tokenInput').value.trim();
+  localStorage.setItem('om_host', state.host);
+  sessionStorage.setItem('om_token', state.token);
+  el('config').classList.remove('open');
+  setStatus('Connection saved. Loading filters…');
+  loadFilters();
+};
+
+// ---------- filters ----------
+el('domainSelect').onchange = () => { state.domain = el('domainSelect').value; runSearch(); };
+el('tagSelect').onchange = () => { state.tag = el('tagSelect').value; runSearch(); };
+el('clearFilters').onclick = () => {
+  state.domain = ''; state.tag = '';
+  el('domainSelect').value = ''; el('tagSelect').value = '';
+  runSearch();
+};
+
+async function authedGet(path) {
+  const res = await fetch(`${state.host}${path}`, {
+    headers: { Authorization: `Bearer ${state.token}` }
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status} on ${path}`);
+  return res.json();
+}
+
+async function loadFilters() {
+  if (!state.token) return;
+  try {
+    const [domains, tags] = await Promise.all([
+      authedGet('/v1/domains?limit=100'),
+      authedGet('/v1/tags?limit=100'),
+    ]);
+
+    const domainSel = el('domainSelect');
+    domainSel.innerHTML = '<option value="">All domains</option>';
+    (domains.data || []).forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.fullyQualifiedName;
+      opt.textContent = d.displayName || d.name;
+      domainSel.appendChild(opt);
+    });
+
+    const tagSel = el('tagSelect');
+    tagSel.innerHTML = '<option value="">All tags</option>';
+    (tags.data || []).forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.fullyQualifiedName;
+      opt.textContent = t.fullyQualifiedName;
+      tagSel.appendChild(opt);
+    });
+
+    el('filterCount').textContent = `${(domains.data||[]).length} domains · ${(tags.data||[]).length} tags loaded`;
+    setStatus('Filters loaded. Ready to search.');
+  } catch (err) {
+    console.error(err);
+    setStatus(`Could not load domain/tag filters: ${err.message}`, true);
+  }
+}
+
+if (state.token) loadFilters();
+
+function setStatus(msg, isError) {
+  const s = el('statusLine');
+  s.textContent = msg || '';
+  s.className = 'status-line' + (isError ? ' error' : '');
+}
+
+// ---------- search ----------
+el('searchBtn').onclick = runSearch;
+el('searchInput').addEventListener('keydown', e => { if (e.key === 'Enter') runSearch(); });
+
+function buildQueryFilter() {
+  const must = [];
+  if (state.domain) must.push({ term: { 'domains.fullyQualifiedName': state.domain } });
+  if (state.tag) must.push({ term: { 'tags.tagFQN': state.tag } });
+  if (!must.length) return null;
+  return { query: { bool: { must } } };
+}
+
+async function runSearch() {
+  const q = el('searchInput').value.trim() || '*';
+  if (!state.token) {
+    setStatus('No token set — open ⚙ connection and paste a Personal Access Token before searching.', true);
+    el('config').classList.add('open');
+    return;
+  }
+  setStatus('Searching…');
+  el('resultsWrap').innerHTML = '';
+
+  const params = new URLSearchParams({ q, index: INDEX, from: '0', size: '25' });
+  const qf = buildQueryFilter();
+  if (qf) params.set('queryFilter', JSON.stringify(qf));
+
+  const url = `${state.host}/v1/search/query?${params.toString()}`;
+
+  try {
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${state.token}` }
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error(`HTTP ${res.status} ${res.statusText}${body ? ' — ' + body.slice(0, 200) : ''}`);
+    }
+    const data = await res.json();
+    renderResults(data);
+  } catch (err) {
+    console.error(err);
+    const corsLikely = err.message.includes('Failed to fetch') || err.message.includes('NetworkError');
+    setStatus(
+      corsLikely
+        ? `Request blocked — likely CORS. The host must allow this page's origin in CORS_ALLOWED_ORIGINS. (${err.message})`
+        : `Search failed: ${err.message}`,
+      true
+    );
+    el('resultsWrap').innerHTML = `<div class="empty">Nothing to show. See the note above the results.</div>`;
+  }
+}
+
+function renderResults(data) {
+  const hits = (data.hits && data.hits.hits) || [];
+  const total = (data.hits && data.hits.total && data.hits.total.value) || hits.length;
+  setStatus(`${total} data product${total === 1 ? '' : 's'} · ${data.took ?? '?'}ms`);
+
+  if (!hits.length) {
+    el('resultsWrap').innerHTML = `<div class="empty">No data products match that query and filter combination.</div>`;
+    return;
+  }
+
+  const wrap = document.createElement('div');
+  wrap.className = 'results';
+
+  hits.forEach(hit => {
+    const src = hit._source || {};
+    const card = document.createElement('div');
+    card.className = 'card';
+
+    const domainLabel = firstDomainLabel(src);
+    const tagsHtml = (src.tags || []).slice(0, 4)
+      .map(t => `<span class="tag">${escapeHtml(t.tagFQN || t.name || '')}</span>`).join('');
+
+    card.innerHTML = `
+      <div class="idx">
+        <div class="type">Data Product</div>
+        ${domainLabel ? `<div class="domain-pill">${escapeHtml(domainLabel)}</div>` : ''}
+      </div>
+      <div>
+        <h3>${escapeHtml(src.displayName || src.name || '(unnamed)')}</h3>
+        <div class="fqn">${escapeHtml(src.fullyQualifiedName || '')}</div>
+        <p>${escapeHtml(stripMd(src.description) || 'No description.')}</p>
+        <div class="tags">${tagsHtml}</div>
+      </div>`;
+    card.onclick = () => openDrawer(src);
+    wrap.appendChild(card);
+  });
+
+  el('resultsWrap').innerHTML = '';
+  el('resultsWrap').appendChild(wrap);
+}
+
+function firstDomainLabel(src) {
+  const domains = src.domains || (src.domain ? [src.domain] : []);
+  if (!domains.length) return '';
+  return domains[0].displayName || domains[0].name || domains[0].fullyQualifiedName || '';
+}
+
+// ---------- drawer ----------
+function openDrawer(src) {
+  el('dTitle').textContent = src.displayName || src.name || '(unnamed)';
+  el('dFqn').textContent = src.fullyQualifiedName || '';
+  el('dDesc').textContent = stripMd(src.description) || 'No description provided.';
+
+  const domains = src.domains || (src.domain ? [src.domain] : []);
+  el('dDomain').innerHTML = domains.length
+    ? domains.map(d => `<span class="tag">${escapeHtml(d.displayName || d.name || '')}</span>`).join('')
+    : '—';
+
+  const owners = src.owners || (src.owner ? [src.owner] : []);
+  el('dOwners').innerHTML = owners.length
+    ? owners.map(o => `<span class="tag">${escapeHtml(o.displayName || o.name || '')}</span>`).join('')
+    : '—';
+
+  const tags = src.tags || [];
+  el('dTags').innerHTML = tags.length
+    ? tags.map(t => `<span class="tag">${escapeHtml(t.tagFQN || t.name || '')}</span>`).join('')
+    : '—';
+
+  el('dRaw').textContent = JSON.stringify(src, null, 2);
+
+  el('overlay').classList.add('open');
+  el('drawer').classList.add('open');
+}
+el('closeDrawer').onclick = closeDrawer;
+el('overlay').onclick = closeDrawer;
+function closeDrawer() {
+  el('overlay').classList.remove('open');
+  el('drawer').classList.remove('open');
+}
+
+// ---------- helpers ----------
+function escapeHtml(str) {
+  return String(str ?? '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+function stripMd(text) {
+  if (!text) return '';
+  return text.replace(/[#*`_>]/g, '').trim();
+}
+</script>
+</body>
+</html>
